@@ -5,7 +5,17 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useUIStore } from '@/stores/uiStore';
 import { libraryItems } from '@/data/libraryItems';
 import { cmToDisplay } from '@/lib/units';
-import { RotateCw } from 'lucide-react';
+import { createFabricPattern } from '@/lib/canvas/patternManager';
+import {
+  enterEditMode,
+  exitEditMode,
+  isEditing,
+  addPointAfter,
+  removePoint,
+  togglePointCurve,
+  getEditPoints,
+} from '@/lib/canvas/pathEditor';
+import { RotateCw, Pencil, Plus, Minus, Spline } from 'lucide-react';
 
 interface ObjectProps {
   x: number;
@@ -15,6 +25,8 @@ interface ObjectProps {
   rotation: number;
   itemId: string;
   behavior: string;
+  patternAngle: number;
+  pointCount: number;
   customProps: Record<string, number | string>;
 }
 
@@ -23,22 +35,28 @@ export default function PropertiesPanel() {
   const fabricCanvas = useCanvasStore((s) => s.fabricCanvas);
   const saveUndoState = useCanvasStore((s) => s.saveUndoState);
   const syncObjectsFromCanvas = useCanvasStore((s) => s.syncObjectsFromCanvas);
+  const editingObjectId = useCanvasStore((s) => s.editingObjectId);
+  const setEditingObjectId = useCanvasStore((s) => s.setEditingObjectId);
   const unit = useUIStore((s) => s.unit);
 
   const [props, setProps] = useState<ObjectProps | null>(null);
+  const [patternAngle, setPatternAngle] = useState(0);
 
   const readProps = useCallback(() => {
-    if (!fabricCanvas || selectedIds.length !== 1) {
+    // Use editingObjectId as fallback when editing (handles steal selection)
+    const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+    if (!fabricCanvas || !targetId) {
       setProps(null);
       return;
     }
     const obj = (fabricCanvas as any)
       .getObjects()
-      .find((o: any) => o.itemUniqueId === selectedIds[0]);
+      .find((o: any) => o.itemUniqueId === targetId);
     if (!obj) {
       setProps(null);
       return;
     }
+    const pathPoints = obj.itemPathPoints;
     setProps({
       x: Math.round(obj.left ?? 0),
       y: Math.round(obj.top ?? 0),
@@ -47,9 +65,12 @@ export default function PropertiesPanel() {
       rotation: Math.round(obj.angle ?? 0),
       itemId: obj.itemId ?? '',
       behavior: obj.itemBehavior ?? 'freeform',
+      patternAngle: obj.itemPatternAngle ?? 0,
+      pointCount: Array.isArray(pathPoints) ? pathPoints.length : 0,
       customProps: {},
     });
-  }, [fabricCanvas, selectedIds]);
+    setPatternAngle(obj.itemPatternAngle ?? 0);
+  }, [fabricCanvas, selectedIds, editingObjectId]);
 
   useEffect(() => {
     readProps();
@@ -83,13 +104,20 @@ export default function PropertiesPanel() {
       ? 'Proportional'
       : props.behavior === 'fixed'
         ? 'Fixed size'
-        : 'Freeform';
+        : props.behavior === 'repeatable'
+          ? 'Repeatable'
+          : props.behavior === 'path'
+            ? 'Path'
+            : 'Freeform';
+
+  const isRepeatableOrPath = props.behavior === 'repeatable' || props.behavior === 'path';
 
   const applyProp = (key: string, value: number) => {
-    if (!fabricCanvas || selectedIds.length !== 1) return;
+    const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+    if (!fabricCanvas || !targetId) return;
     const obj = (fabricCanvas as any)
       .getObjects()
-      .find((o: any) => o.itemUniqueId === selectedIds[0]);
+      .find((o: any) => o.itemUniqueId === targetId);
     if (!obj) return;
 
     saveUndoState();
@@ -118,8 +146,74 @@ export default function PropertiesPanel() {
     readProps();
   };
 
+  const handlePatternAngleChange = (angle: number) => {
+    const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+    if (!fabricCanvas || !targetId) return;
+    const obj = (fabricCanvas as any)
+      .getObjects()
+      .find((o: any) => o.itemUniqueId === targetId);
+    if (!obj || obj.itemBehavior !== 'repeatable') return;
+
+    setPatternAngle(angle);
+    obj.itemPatternAngle = angle;
+
+    // Recreate the pattern with the new angle
+    const svgStr = obj.itemPatternSvg;
+    const pw = obj.itemPatternWidth;
+    const ph = obj.itemPatternHeight;
+    if (!svgStr || !pw || !ph) return;
+
+    import('fabric').then(({ fabric }) => {
+      createFabricPattern(fabric, svgStr, pw, ph, angle, (pattern) => {
+        obj.set('fill', pattern);
+        (fabricCanvas as any).requestRenderAll();
+      });
+    });
+  };
+
+  const handleEditPoints = () => {
+    const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+    if (!fabricCanvas || !targetId) return;
+    const obj = (fabricCanvas as any)
+      .getObjects()
+      .find((o: any) => o.itemUniqueId === targetId);
+    if (!obj) return;
+
+    if (isEditing()) {
+      // Exit edit mode
+      exitEditMode();
+      setEditingObjectId(null);
+      saveUndoState();
+    } else {
+      // Enter edit mode
+      import('fabric').then(({ fabric }) => {
+        setEditingObjectId(obj.itemUniqueId);
+        enterEditMode(fabric, fabricCanvas as any, obj, () => {
+          syncObjectsFromCanvas();
+          readProps();
+        });
+      });
+    }
+  };
+
+  const handleStrokeWidthChange = (value: number) => {
+    const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+    if (!fabricCanvas || !targetId) return;
+    const obj = (fabricCanvas as any)
+      .getObjects()
+      .find((o: any) => o.itemUniqueId === targetId);
+    if (!obj || obj.itemBehavior !== 'path') return;
+
+    saveUndoState();
+    obj.set('strokeWidth', value);
+    obj.setCoords();
+    (fabricCanvas as any).requestRenderAll();
+    syncObjectsFromCanvas();
+    readProps();
+  };
+
   return (
-    <div className="px-3 py-2.5 border-t border-border">
+    <div className="px-3 py-2.5 border-t border-border overflow-y-auto">
       <h2 className="text-sm font-semibold text-text-primary mb-3">Properties</h2>
 
       {/* Item type badge */}
@@ -148,8 +242,8 @@ export default function PropertiesPanel() {
         />
       </div>
 
-      {/* Size (not for fixed) */}
-      {props.behavior !== 'fixed' && (
+      {/* Size (not for fixed, repeatable, or path) */}
+      {props.behavior !== 'fixed' && !isRepeatableOrPath && (
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
           <PropField
             label="W"
@@ -177,37 +271,150 @@ export default function PropertiesPanel() {
         />
       </div>
 
-      {/* Custom item properties */}
-      {libraryItem?.properties.map((propDef) => (
-        <div key={propDef.key} className="mb-2">
-          {propDef.type === 'number' && (
-            <div>
-              <label className="text-[11px] text-text-secondary mb-0.5 block">{propDef.label}</label>
-              <input
-                type="range"
-                min={propDef.min}
-                max={propDef.max}
-                step={propDef.step}
-                defaultValue={propDef.defaultValue as number}
-                className="w-full accent-terra h-1"
-              />
-              <div className="text-[10px] text-text-muted text-right">
-                {cmToDisplay(propDef.defaultValue as number, unit)}
+      {/* Path/Repeatable: Edit Points button */}
+      {isRepeatableOrPath && (
+        <div className="mb-3">
+          <button
+            onClick={handleEditPoints}
+            className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] rounded border transition-colors ${
+              editingObjectId
+                ? 'bg-terra text-white border-terra'
+                : 'bg-cream text-text-secondary border-border hover:border-terra'
+            }`}
+          >
+            <Pencil size={12} />
+            {editingObjectId ? 'Finish Editing' : 'Edit Points'}
+          </button>
+          {editingObjectId && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[10px] text-text-muted">
+                {props.pointCount} points · Dbl-click vertex to toggle curve
+              </p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    const pts = getEditPoints();
+                    if (pts) addPointAfter(pts.length - 1);
+                    readProps();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 text-[10px] bg-cream text-text-secondary rounded border border-border hover:border-terra"
+                  title="Add point at end"
+                >
+                  <Plus size={10} /> Add Point
+                </button>
+                <button
+                  onClick={() => {
+                    const pts = getEditPoints();
+                    if (pts && pts.length > 0) removePoint(pts.length - 1);
+                    readProps();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 text-[10px] bg-cream text-text-secondary rounded border border-border hover:border-terra"
+                  title="Remove last point"
+                >
+                  <Minus size={10} /> Remove
+                </button>
               </div>
-            </div>
-          )}
-          {propDef.type === 'color' && (
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] text-text-secondary">{propDef.label}</label>
-              <input
-                type="color"
-                defaultValue={propDef.defaultValue as string}
-                className="w-6 h-6 rounded border border-border cursor-pointer"
-              />
+              <button
+                onClick={() => {
+                  const pts = getEditPoints();
+                  if (pts && pts.length > 0) {
+                    togglePointCurve(pts.length - 1);
+                    readProps();
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1 px-1.5 py-1 text-[10px] bg-cream text-text-secondary rounded border border-border hover:border-terra"
+                title="Toggle curve on last point"
+              >
+                <Spline size={10} /> Toggle Curve (last point)
+              </button>
             </div>
           )}
         </div>
-      ))}
+      )}
+
+      {/* Path: Stroke width */}
+      {props.behavior === 'path' && (
+        <div className="mb-3">
+          <label className="text-[11px] text-text-secondary mb-0.5 block">Thickness</label>
+          <input
+            type="range"
+            min={2}
+            max={40}
+            step={1}
+            value={(() => {
+              const tid = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+              if (!fabricCanvas || !tid) return 10;
+              const obj = (fabricCanvas as any)
+                .getObjects()
+                .find((o: any) => o.itemUniqueId === tid);
+              return obj?.strokeWidth ?? 10;
+            })()}
+            onChange={(e) => handleStrokeWidthChange(Number(e.target.value))}
+            className="w-full accent-terra h-1"
+          />
+          <div className="text-[10px] text-text-muted text-right">
+            {(() => {
+              const tid = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+              if (!fabricCanvas || !tid) return '10px';
+              const obj = (fabricCanvas as any)
+                .getObjects()
+                .find((o: any) => o.itemUniqueId === tid);
+              return `${obj?.strokeWidth ?? 10}px`;
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Repeatable: Pattern direction */}
+      {props.behavior === 'repeatable' && (
+        <div className="mb-3">
+          <label className="text-[11px] text-text-secondary mb-0.5 block">Pattern Direction</label>
+          <input
+            type="range"
+            min={0}
+            max={360}
+            step={15}
+            value={patternAngle}
+            onChange={(e) => handlePatternAngleChange(Number(e.target.value))}
+            className="w-full accent-terra h-1"
+          />
+          <div className="text-[10px] text-text-muted text-right">{patternAngle}°</div>
+        </div>
+      )}
+
+      {/* Custom item properties (excluding ones we handle specially) */}
+      {libraryItem?.properties
+        .filter((p) => p.key !== 'patternAngle' && p.key !== 'strokeWidth')
+        .map((propDef) => (
+          <div key={propDef.key} className="mb-2">
+            {propDef.type === 'number' && (
+              <div>
+                <label className="text-[11px] text-text-secondary mb-0.5 block">{propDef.label}</label>
+                <input
+                  type="range"
+                  min={propDef.min}
+                  max={propDef.max}
+                  step={propDef.step}
+                  defaultValue={propDef.defaultValue as number}
+                  className="w-full accent-terra h-1"
+                />
+                <div className="text-[10px] text-text-muted text-right">
+                  {cmToDisplay(propDef.defaultValue as number, unit)}
+                </div>
+              </div>
+            )}
+            {propDef.type === 'color' && (
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-text-secondary">{propDef.label}</label>
+                <input
+                  type="color"
+                  defaultValue={propDef.defaultValue as string}
+                  className="w-6 h-6 rounded border border-border cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+        ))}
     </div>
   );
 }
