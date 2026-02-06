@@ -1,4 +1,12 @@
-export type ItemBehavior = 'proportional' | 'freeform' | 'fixed';
+export type ItemBehavior = 'proportional' | 'freeform' | 'fixed' | 'repeatable' | 'path';
+
+export interface PathPoint {
+  x: number;
+  y: number;
+  curve?: boolean;  // if true, incoming segment is a quadratic bezier
+  cx?: number;      // control point x (for quadratic bezier)
+  cy?: number;      // control point y
+}
 
 export type ItemCategory =
   | 'trees-shrubs'
@@ -29,6 +37,13 @@ export interface LibraryItem {
   defaultWidth: number;  // in cm
   defaultHeight: number; // in cm
   properties: ItemPropertyDef[];
+  // For 'repeatable' behavior: pattern tile SVG and dimensions
+  patternSvg?: string;
+  patternWidth?: number;  // tile width in px (viewBox units)
+  patternHeight?: number; // tile height in px (viewBox units)
+  // For 'path' behavior: stroke settings
+  defaultStrokeWidth?: number; // in cm
+  defaultStrokeColor?: string;
 }
 
 export interface Category {

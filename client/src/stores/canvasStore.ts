@@ -9,6 +9,9 @@ interface CanvasState {
   objects: CanvasObjectMeta[];
   selectedIds: string[];
 
+  // Editing mode for path/repeatable items
+  editingObjectId: string | null;
+
   // Undo / redo stacks hold serialised canvas JSON
   undoStack: string[];
   redoStack: string[];
@@ -23,6 +26,9 @@ interface CanvasState {
   removeObject: (id: string) => void;
   reorderObject: (id: string, direction: 'up' | 'down') => void;
 
+  // Edit mode
+  setEditingObjectId: (id: string | null) => void;
+
   // Undo / Redo
   saveUndoState: () => void;
   undo: () => void;
@@ -32,21 +38,24 @@ interface CanvasState {
 }
 
 function getObjectsMeta(canvas: fabric.Canvas): CanvasObjectMeta[] {
-  return canvas.getObjects().map((obj, index) => ({
-    id: (obj as any).itemUniqueId ?? `obj-${index}`,
-    itemId: (obj as any).itemId ?? '',
-    name: (obj as any).itemName ?? `Object ${index + 1}`,
-    visible: obj.visible !== false,
-    locked: obj.lockMovementX === true && obj.lockMovementY === true,
-    zIndex: index,
-    behavior: ((obj as any).itemBehavior ?? 'freeform') as ItemBehavior,
-  }));
+  return canvas.getObjects()
+    .filter((obj) => !(obj as any)._isEditHandle)
+    .map((obj, index) => ({
+      id: (obj as any).itemUniqueId ?? `obj-${index}`,
+      itemId: (obj as any).itemId ?? '',
+      name: (obj as any).itemName ?? `Object ${index + 1}`,
+      visible: obj.visible !== false,
+      locked: obj.lockMovementX === true && obj.lockMovementY === true,
+      zIndex: index,
+      behavior: ((obj as any).itemBehavior ?? 'freeform') as ItemBehavior,
+    }));
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   fabricCanvas: null,
   objects: [],
   selectedIds: [],
+  editingObjectId: null,
   undoStack: [],
   redoStack: [],
 
@@ -118,10 +127,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     syncObjectsFromCanvas();
   },
 
+  setEditingObjectId: (id) => set({ editingObjectId: id }),
+
   saveUndoState: () => {
     const { fabricCanvas, undoStack } = get();
     if (!fabricCanvas) return;
-    const json = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior']));
+    const json = JSON.stringify(
+      fabricCanvas.toJSON([
+        'itemUniqueId', 'itemId', 'itemName', 'itemBehavior',
+        'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg',
+        'itemPatternWidth', 'itemPatternHeight',
+      ]),
+    );
     const newStack = [...undoStack, json].slice(-MAX_UNDO);
     set({ undoStack: newStack, redoStack: [] });
   },
@@ -129,7 +146,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   undo: () => {
     const { fabricCanvas, undoStack, redoStack, syncObjectsFromCanvas } = get();
     if (!fabricCanvas || undoStack.length === 0) return;
-    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior']));
+    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight']));
     const prevJson = undoStack[undoStack.length - 1];
     set({
       undoStack: undoStack.slice(0, -1),
@@ -144,7 +161,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   redo: () => {
     const { fabricCanvas, undoStack, redoStack, syncObjectsFromCanvas } = get();
     if (!fabricCanvas || redoStack.length === 0) return;
-    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior']));
+    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight']));
     const nextJson = redoStack[redoStack.length - 1];
     set({
       redoStack: redoStack.slice(0, -1),

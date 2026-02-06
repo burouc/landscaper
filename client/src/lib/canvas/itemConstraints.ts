@@ -72,5 +72,50 @@ export function applyConstraints(obj: fabric.Object, behavior: ItemBehavior) {
         mtr: true, // only rotation
       });
       break;
+
+    case 'repeatable':
+      // Repeatable items use path shapes with pattern fill.
+      // No scaling via handles — shape is edited by moving path points.
+      // Allow rotation and movement.
+      obj.set({
+        lockScalingX: true,
+        lockScalingY: true,
+        lockSkewingX: true,
+        lockSkewingY: true,
+      });
+      obj.setControlsVisibility({
+        mt: false,
+        mb: false,
+        ml: false,
+        mr: false,
+        tl: false,
+        tr: false,
+        bl: false,
+        br: false,
+        mtr: true,
+      });
+      break;
+
+    case 'path':
+      // Path items are stroked lines — no scaling, shape edited via path points.
+      // Allow rotation and movement.
+      obj.set({
+        lockScalingX: true,
+        lockScalingY: true,
+        lockSkewingX: true,
+        lockSkewingY: true,
+      });
+      obj.setControlsVisibility({
+        mt: false,
+        mb: false,
+        ml: false,
+        mr: false,
+        tl: false,
+        tr: false,
+        bl: false,
+        br: false,
+        mtr: true,
+      });
+      break;
   }
 }

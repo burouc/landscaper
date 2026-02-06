@@ -80,21 +80,33 @@ export const libraryItems: LibraryItem[] = [
     id: 'lawn',
     name: 'Lawn',
     category: 'ground-cover',
-    behavior: 'freeform',
+    behavior: 'repeatable',
     svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="2" width="96" height="96" rx="3" fill="#7EC88B" stroke="#6AB878" stroke-width="2" stroke-dasharray="4 2"/>
     </svg>`,
+    patternSvg: `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" fill="#7EC88B"/>
+      <path d="M5 38 L7 28 L9 38" stroke="#6AB878" stroke-width="0.8" fill="none"/>
+      <path d="M18 38 L20 30 L22 38" stroke="#5A9E6A" stroke-width="0.8" fill="none"/>
+      <path d="M32 38 L34 32 L36 38" stroke="#6AB878" stroke-width="0.8" fill="none"/>
+      <path d="M12 20 L14 12 L16 20" stroke="#6AB878" stroke-width="0.8" fill="none"/>
+      <path d="M26 20 L28 10 L30 20" stroke="#5A9E6A" stroke-width="0.8" fill="none"/>
+      <path d="M2 20 L4 14 L6 20" stroke="#5A9E6A" stroke-width="0.8" fill="none"/>
+    </svg>`,
+    patternWidth: 40,
+    patternHeight: 40,
     defaultWidth: 500,
     defaultHeight: 500,
     properties: [
       { key: 'fill', label: 'Color', type: 'color', defaultValue: '#7EC88B' },
+      { key: 'patternAngle', label: 'Pattern Direction', type: 'number', min: 0, max: 360, step: 15, defaultValue: 0, unit: '°' },
     ],
   },
   {
     id: 'paver-patio',
     name: 'Paver Patio',
     category: 'ground-cover',
-    behavior: 'freeform',
+    behavior: 'repeatable',
     svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="2" width="96" height="96" fill="#C4A882" stroke="#B09870" stroke-width="2"/>
       <line x1="33" y1="2" x2="33" y2="98" stroke="#B09870" stroke-width="1"/>
@@ -102,28 +114,50 @@ export const libraryItems: LibraryItem[] = [
       <line x1="2" y1="33" x2="98" y2="33" stroke="#B09870" stroke-width="1"/>
       <line x1="2" y1="66" x2="98" y2="66" stroke="#B09870" stroke-width="1"/>
     </svg>`,
+    patternSvg: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+      <rect width="60" height="60" fill="#C4A882"/>
+      <rect x="1" y="1" width="28" height="28" fill="#CCBA96" stroke="#B09870" stroke-width="0.5"/>
+      <rect x="31" y="1" width="28" height="28" fill="#C4A882" stroke="#B09870" stroke-width="0.5"/>
+      <rect x="1" y="31" width="28" height="28" fill="#C4A882" stroke="#B09870" stroke-width="0.5"/>
+      <rect x="31" y="31" width="28" height="28" fill="#CCBA96" stroke="#B09870" stroke-width="0.5"/>
+    </svg>`,
+    patternWidth: 60,
+    patternHeight: 60,
     defaultWidth: 400,
     defaultHeight: 400,
     properties: [
       { key: 'fill', label: 'Color', type: 'color', defaultValue: '#C4A882' },
+      { key: 'patternAngle', label: 'Pattern Direction', type: 'number', min: 0, max: 360, step: 15, defaultValue: 0, unit: '°' },
     ],
   },
   {
     id: 'gravel',
     name: 'Gravel Path',
     category: 'ground-cover',
-    behavior: 'freeform',
+    behavior: 'repeatable',
     svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="2" width="96" height="96" fill="#D4C5A9" stroke="#C4B599" stroke-width="2"/>
       <circle cx="20" cy="25" r="4" fill="#C4B599"/><circle cx="45" cy="15" r="3" fill="#BEA88E"/>
-      <circle cx="70" cy="30" r="5" fill="#C4B599"/><circle cx="30" cy="55" r="3" fill="#BEA88E"/>
-      <circle cx="55" cy="50" r="4" fill="#C4B599"/><circle cx="80" cy="60" r="3" fill="#BEA88E"/>
-      <circle cx="25" cy="80" r="4" fill="#C4B599"/><circle cx="60" cy="85" r="3" fill="#BEA88E"/>
+      <circle cx="70" cy="30" r="5" fill="#C4B599"/><circle cx="80" cy="60" r="3" fill="#BEA88E"/>
     </svg>`,
+    patternSvg: `<svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+      <rect width="50" height="50" fill="#D4C5A9"/>
+      <circle cx="10" cy="12" r="3.5" fill="#C4B599" opacity="0.8"/>
+      <circle cx="30" cy="8" r="2.5" fill="#BEA88E" opacity="0.7"/>
+      <circle cx="45" cy="18" r="4" fill="#C4B599" opacity="0.8"/>
+      <circle cx="18" cy="32" r="3" fill="#BEA88E" opacity="0.7"/>
+      <circle cx="38" cy="35" r="3.5" fill="#C4B599" opacity="0.8"/>
+      <circle cx="8" cy="45" r="2.5" fill="#BEA88E" opacity="0.7"/>
+      <circle cx="28" cy="46" r="3" fill="#C4B599" opacity="0.8"/>
+      <circle cx="46" cy="42" r="2" fill="#BEA88E" opacity="0.7"/>
+    </svg>`,
+    patternWidth: 50,
+    patternHeight: 50,
     defaultWidth: 300,
     defaultHeight: 100,
     properties: [
       { key: 'fill', label: 'Color', type: 'color', defaultValue: '#D4C5A9' },
+      { key: 'patternAngle', label: 'Pattern Direction', type: 'number', min: 0, max: 360, step: 15, defaultValue: 0, unit: '°' },
     ],
   },
   {
@@ -207,7 +241,7 @@ export const libraryItems: LibraryItem[] = [
     id: 'fence',
     name: 'Fence',
     category: 'structures',
-    behavior: 'freeform',
+    behavior: 'path',
     svgPath: `<svg viewBox="0 0 200 20" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="2" width="196" height="16" fill="#C4A882" stroke="#B09870" stroke-width="2"/>
       <rect x="10" y="0" width="4" height="20" fill="#B09870"/>
@@ -218,15 +252,18 @@ export const libraryItems: LibraryItem[] = [
     </svg>`,
     defaultWidth: 300,
     defaultHeight: 20,
+    defaultStrokeWidth: 8,
+    defaultStrokeColor: '#C4A882',
     properties: [
       { key: 'height', label: 'Height', type: 'number', min: 50, max: 250, step: 10, unit: 'cm', defaultValue: 120 },
+      { key: 'strokeWidth', label: 'Thickness', type: 'number', min: 2, max: 30, step: 1, unit: 'px', defaultValue: 8 },
     ],
   },
   {
     id: 'wall',
     name: 'Wall',
     category: 'structures',
-    behavior: 'freeform',
+    behavior: 'path',
     svgPath: `<svg viewBox="0 0 200 30" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="2" width="196" height="26" fill="#9E8E7E" stroke="#8E7E6E" stroke-width="2"/>
       <line x1="40" y1="2" x2="40" y2="28" stroke="#8E7E6E" stroke-width="1"/>
@@ -236,8 +273,11 @@ export const libraryItems: LibraryItem[] = [
     </svg>`,
     defaultWidth: 300,
     defaultHeight: 30,
+    defaultStrokeWidth: 12,
+    defaultStrokeColor: '#9E8E7E',
     properties: [
       { key: 'height', label: 'Height', type: 'number', min: 50, max: 300, step: 10, unit: 'cm', defaultValue: 180 },
+      { key: 'strokeWidth', label: 'Thickness', type: 'number', min: 2, max: 40, step: 1, unit: 'px', defaultValue: 12 },
     ],
   },
   {

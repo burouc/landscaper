@@ -8,6 +8,17 @@ import { libraryItems } from '@/data/libraryItems';
 import { drawGrid } from '@/lib/canvas/gridManager';
 import { snapToGrid, snapScaleToGrid } from '@/lib/canvas/snapManager';
 import { applyConstraints } from '@/lib/canvas/itemConstraints';
+import {
+  createFabricPattern,
+  pathPointsToPathString,
+  defaultRectPoints,
+  defaultLinePoints,
+} from '@/lib/canvas/patternManager';
+import {
+  enterEditMode,
+  exitEditMode,
+  isEditing,
+} from '@/lib/canvas/pathEditor';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function CanvasEditor() {
@@ -17,6 +28,8 @@ export default function CanvasEditor() {
 
   const { setFabricCanvas, syncObjectsFromCanvas, setSelectedIds, saveUndoState } =
     useCanvasStore();
+  const setEditingObjectId = useCanvasStore((s) => s.setEditingObjectId);
+  const editingObjectId = useCanvasStore((s) => s.editingObjectId);
   const unit = useUIStore((s) => s.unit);
   const snapEnabled = useUIStore((s) => s.snapToGrid);
   const gridVisible = useUIStore((s) => s.gridVisible);
@@ -45,6 +58,8 @@ export default function CanvasEditor() {
         backgroundColor: '#FFFFFF',
         selection: true,
         preserveObjectStacking: true,
+        fireRightClick: true,
+        stopContextMenu: true,
       });
 
       fabricRef.current = canvas;
@@ -84,6 +99,32 @@ export default function CanvasEditor() {
       canvas.on('object:modified', () => {
         saveUndoState();
         syncObjectsFromCanvas();
+      });
+
+      // ── Double-click to enter path/shape edit mode ──
+      canvas.on('mouse:dblclick', (opt: any) => {
+        const target = opt.target;
+        if (!target) return;
+        const behavior = target.itemBehavior;
+        if (behavior === 'repeatable' || behavior === 'path') {
+          // Enter point editing mode
+          const objId = target.itemUniqueId;
+          if (objId) {
+            useCanvasStore.getState().setEditingObjectId(objId);
+            enterEditMode(fabric, canvas, target, () => {
+              syncObjectsFromCanvas();
+            });
+          }
+        }
+      });
+
+      // ── Click on empty space exits edit mode ──
+      canvas.on('mouse:down', (opt: any) => {
+        if (isEditing() && !opt.target) {
+          exitEditMode();
+          useCanvasStore.getState().setEditingObjectId(null);
+          useCanvasStore.getState().saveUndoState();
+        }
       });
 
       // ── Zoom with scroll ──
@@ -130,8 +171,18 @@ export default function CanvasEditor() {
 
       // ── Keyboard shortcuts ──
       const handleKeyDown = (e: KeyboardEvent) => {
+        // Escape exits edit mode
+        if (e.key === 'Escape' && isEditing()) {
+          exitEditMode();
+          useCanvasStore.getState().setEditingObjectId(null);
+          useCanvasStore.getState().saveUndoState();
+          canvas.requestRenderAll();
+          return;
+        }
+
         // Delete selected
         if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (isEditing()) return; // Don't delete while editing points
           const active = canvas.getActiveObjects();
           if (active.length) {
             saveUndoState();
@@ -144,11 +195,19 @@ export default function CanvasEditor() {
         // Undo
         if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
           e.preventDefault();
+          if (isEditing()) {
+            exitEditMode();
+            useCanvasStore.getState().setEditingObjectId(null);
+          }
           useCanvasStore.getState().undo();
         }
         // Redo
         if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
           e.preventDefault();
+          if (isEditing()) {
+            exitEditMode();
+            useCanvasStore.getState().setEditingObjectId(null);
+          }
           useCanvasStore.getState().redo();
         }
       };
@@ -231,6 +290,12 @@ export default function CanvasEditor() {
       <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur px-2 py-1 rounded text-xs text-text-secondary select-none">
         {Math.round(zoom * 100)}%
       </div>
+      {/* Edit mode indicator */}
+      {editingObjectId && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-terra/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
+          Editing points — Dbl-click point to toggle curve · ESC to finish
+        </div>
+      )}
     </div>
   );
 }
@@ -245,40 +310,162 @@ function addItemToCanvas(
   import('fabric').then(({ fabric }) => {
     const uniqueId = uuidv4();
 
-    fabric.loadSVGFromString(item.svgPath, (objects: any[], options: any) => {
-      const group = fabric.util.groupSVGElements(objects, options);
+    if (item.behavior === 'repeatable') {
+      addRepeatableItem(fabric, canvas, item, x, y, uniqueId);
+    } else if (item.behavior === 'path') {
+      addPathItem(fabric, canvas, item, x, y, uniqueId);
+    } else {
+      // Default SVG-based item creation for proportional, freeform, fixed
+      addSvgItem(fabric, canvas, item, x, y, uniqueId);
+    }
+  });
+}
 
-      // Scale SVG to match default dimensions
-      const svgWidth = group.width || 100;
-      const svgHeight = group.height || 100;
-      const scaleX = item.defaultWidth / svgWidth;
-      const scaleY = item.defaultHeight / svgHeight;
+/** Create a repeatable item (polygon path with pattern fill). */
+function addRepeatableItem(
+  fabric: any,
+  canvas: any,
+  item: LibraryItem,
+  x: number,
+  y: number,
+  uniqueId: string,
+) {
+  const points = defaultRectPoints(item.defaultWidth, item.defaultHeight);
+  const pathString = pathPointsToPathString(points, true);
+  const pathObj = new fabric.Path(pathString, {
+    left: x - item.defaultWidth / 2,
+    top: y - item.defaultHeight / 2,
+    fill: '#CCCCCC', // placeholder until pattern loads
+    stroke: '#999999',
+    strokeWidth: 1,
+    originX: 'left',
+    originY: 'top',
+  });
 
-      group.set({
-        left: x - (item.defaultWidth / 2),
-        top: y - (item.defaultHeight / 2),
-        scaleX,
-        scaleY,
-        originX: 'left',
-        originY: 'top',
-      });
+  // Store metadata
+  (pathObj as any).itemUniqueId = uniqueId;
+  (pathObj as any).itemId = item.id;
+  (pathObj as any).itemName = item.name;
+  (pathObj as any).itemBehavior = item.behavior;
+  (pathObj as any).itemPathPoints = JSON.parse(JSON.stringify(points));
+  (pathObj as any).itemPatternAngle = 0;
+  (pathObj as any).itemPatternSvg = item.patternSvg;
+  (pathObj as any).itemPatternWidth = item.patternWidth;
+  (pathObj as any).itemPatternHeight = item.patternHeight;
 
-      // Store metadata on the fabric object
-      (group as any).itemUniqueId = uniqueId;
-      (group as any).itemId = item.id;
-      (group as any).itemName = item.name;
-      (group as any).itemBehavior = item.behavior;
+  applyConstraints(pathObj, item.behavior);
 
-      applyConstraints(group, item.behavior);
+  const store = useCanvasStore.getState();
+  store.saveUndoState();
 
-      const store = useCanvasStore.getState();
-      store.saveUndoState();
+  canvas.add(pathObj);
+  canvas.setActiveObject(pathObj);
+  canvas.requestRenderAll();
+  store.syncObjectsFromCanvas();
 
-      canvas.add(group);
-      canvas.setActiveObject(group);
-      canvas.requestRenderAll();
+  // Load pattern asynchronously and apply
+  if (item.patternSvg && item.patternWidth && item.patternHeight) {
+    createFabricPattern(
+      fabric,
+      item.patternSvg,
+      item.patternWidth,
+      item.patternHeight,
+      0, // initial angle
+      (pattern) => {
+        pathObj.set('fill', pattern);
+        pathObj.set('stroke', 'rgba(0,0,0,0.15)');
+        canvas.requestRenderAll();
+      },
+    );
+  }
+}
 
-      store.syncObjectsFromCanvas();
+/** Create a path item (stroke-based path for walls/fences). */
+function addPathItem(
+  fabric: any,
+  canvas: any,
+  item: LibraryItem,
+  x: number,
+  y: number,
+  uniqueId: string,
+) {
+  const points = defaultLinePoints(item.defaultWidth);
+  const pathString = pathPointsToPathString(points, false);
+  const strokeW = item.defaultStrokeWidth ?? 10;
+  const strokeC = item.defaultStrokeColor ?? '#9E8E7E';
+
+  const pathObj = new fabric.Path(pathString, {
+    left: x - item.defaultWidth / 2,
+    top: y,
+    fill: null,
+    stroke: strokeC,
+    strokeWidth: strokeW,
+    strokeLineCap: 'round',
+    strokeLineJoin: 'round',
+    originX: 'left',
+    originY: 'center',
+  });
+
+  // Store metadata
+  (pathObj as any).itemUniqueId = uniqueId;
+  (pathObj as any).itemId = item.id;
+  (pathObj as any).itemName = item.name;
+  (pathObj as any).itemBehavior = item.behavior;
+  (pathObj as any).itemPathPoints = JSON.parse(JSON.stringify(points));
+
+  applyConstraints(pathObj, item.behavior);
+
+  const store = useCanvasStore.getState();
+  store.saveUndoState();
+
+  canvas.add(pathObj);
+  canvas.setActiveObject(pathObj);
+  canvas.requestRenderAll();
+  store.syncObjectsFromCanvas();
+}
+
+/** Create a standard SVG-based item (proportional, freeform, fixed). */
+function addSvgItem(
+  fabric: any,
+  canvas: any,
+  item: LibraryItem,
+  x: number,
+  y: number,
+  uniqueId: string,
+) {
+  fabric.loadSVGFromString(item.svgPath, (objects: any[], options: any) => {
+    const group = fabric.util.groupSVGElements(objects, options);
+
+    // Scale SVG to match default dimensions
+    const svgWidth = group.width || 100;
+    const svgHeight = group.height || 100;
+    const scaleX = item.defaultWidth / svgWidth;
+    const scaleY = item.defaultHeight / svgHeight;
+
+    group.set({
+      left: x - (item.defaultWidth / 2),
+      top: y - (item.defaultHeight / 2),
+      scaleX,
+      scaleY,
+      originX: 'left',
+      originY: 'top',
     });
+
+    // Store metadata on the fabric object
+    (group as any).itemUniqueId = uniqueId;
+    (group as any).itemId = item.id;
+    (group as any).itemName = item.name;
+    (group as any).itemBehavior = item.behavior;
+
+    applyConstraints(group, item.behavior);
+
+    const store = useCanvasStore.getState();
+    store.saveUndoState();
+
+    canvas.add(group);
+    canvas.setActiveObject(group);
+    canvas.requestRenderAll();
+
+    store.syncObjectsFromCanvas();
   });
 }
