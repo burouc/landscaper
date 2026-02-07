@@ -165,6 +165,73 @@ export function getEditPoints(): PathPoint[] | null {
   return currentEdit?.points ?? null;
 }
 
+/**
+ * Curve all eligible points on a path/repeatable object.
+ * Works regardless of whether the object is in edit mode.
+ * @param tension 0.05–0.5 (how far control points are from vertex toward midpoint)
+ */
+export function curveAllObjectPoints(
+  fabric: any,
+  obj: any,
+  tension: number,
+): void {
+  const points: PathPoint[] = JSON.parse(JSON.stringify(obj.itemPathPoints || []));
+  if (points.length < 2) return;
+
+  const closed: boolean = obj.itemBehavior === 'repeatable';
+  const n = points.length;
+
+  for (let i = 0; i < n; i++) {
+    // First point of an open path has no incoming segment to curve
+    if (!closed && i === 0) continue;
+
+    const prevIdx = (i - 1 + n) % n;
+    const prev = points[prevIdx];
+    const pt = points[i];
+
+    pt.curve = true;
+    pt.cx = pt.x + tension * (prev.x - pt.x);
+    pt.cy = pt.y + tension * (prev.y - pt.y);
+  }
+
+  obj.itemPathPoints = JSON.parse(JSON.stringify(points));
+  obj.itemCurveTension = tension;
+  updatePathFromPoints(fabric, obj, points, closed);
+
+  // If currently editing this object, sync the edit state handles
+  if (currentEdit && currentEdit.targetObj === obj) {
+    currentEdit.points = JSON.parse(JSON.stringify(points));
+    rebuildHandles();
+  }
+}
+
+/**
+ * Remove all curves from a path/repeatable object, making all segments straight.
+ */
+export function straightenAllObjectPoints(
+  fabric: any,
+  obj: any,
+): void {
+  const points: PathPoint[] = JSON.parse(JSON.stringify(obj.itemPathPoints || []));
+  if (points.length < 2) return;
+
+  for (const pt of points) {
+    pt.curve = false;
+    delete pt.cx;
+    delete pt.cy;
+  }
+
+  const closed: boolean = obj.itemBehavior === 'repeatable';
+  obj.itemPathPoints = JSON.parse(JSON.stringify(points));
+  obj.itemCurveTension = 0;
+  updatePathFromPoints(fabric, obj, points, closed);
+
+  if (currentEdit && currentEdit.targetObj === obj) {
+    currentEdit.points = JSON.parse(JSON.stringify(points));
+    rebuildHandles();
+  }
+}
+
 // ── Internal helpers ──
 
 function applyPointsToObject(): void {

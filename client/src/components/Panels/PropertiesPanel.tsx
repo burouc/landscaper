@@ -14,6 +14,8 @@ import {
   removePoint,
   togglePointCurve,
   getEditPoints,
+  curveAllObjectPoints,
+  straightenAllObjectPoints,
 } from '@/lib/canvas/pathEditor';
 import { RotateCw, Pencil, Plus, Minus, Spline } from 'lucide-react';
 
@@ -27,6 +29,8 @@ interface ObjectProps {
   behavior: string;
   patternAngle: number;
   pointCount: number;
+  hasCurves: boolean;
+  curveTension: number;
   customProps: Record<string, number | string>;
 }
 
@@ -57,6 +61,9 @@ export default function PropertiesPanel() {
       return;
     }
     const pathPoints = obj.itemPathPoints;
+    const hasCurves = Array.isArray(pathPoints)
+      ? pathPoints.some((p: any) => p.curve === true)
+      : false;
     setProps({
       x: Math.round(obj.left ?? 0),
       y: Math.round(obj.top ?? 0),
@@ -67,6 +74,8 @@ export default function PropertiesPanel() {
       behavior: obj.itemBehavior ?? 'freeform',
       patternAngle: obj.itemPatternAngle ?? 0,
       pointCount: Array.isArray(pathPoints) ? pathPoints.length : 0,
+      hasCurves,
+      curveTension: obj.itemCurveTension ?? 0.3,
       customProps: {},
     });
     setPatternAngle(obj.itemPatternAngle ?? 0);
@@ -327,6 +336,95 @@ export default function PropertiesPanel() {
               >
                 <Spline size={10} /> Toggle Curve (last point)
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Curve options for repeatable/path items */}
+      {isRepeatableOrPath && (
+        <div className="mb-3">
+          <label className="text-[11px] text-text-secondary mb-1 block">Curves</label>
+          <div className="flex gap-1 mb-1.5">
+            <button
+              onClick={() => {
+                const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+                if (!fabricCanvas || !targetId) return;
+                const obj = (fabricCanvas as any)
+                  .getObjects()
+                  .find((o: any) => o.itemUniqueId === targetId);
+                if (!obj) return;
+                saveUndoState();
+                import('fabric').then(({ fabric }) => {
+                  curveAllObjectPoints(fabric, obj, obj.itemCurveTension || 0.3);
+                  (fabricCanvas as any).requestRenderAll();
+                  syncObjectsFromCanvas();
+                  readProps();
+                });
+              }}
+              className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1.5 text-[10px] bg-cream text-text-secondary rounded border border-border hover:border-terra transition-colors"
+              title="Curve all corners"
+            >
+              <Spline size={10} /> Curve All
+            </button>
+            <button
+              onClick={() => {
+                const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+                if (!fabricCanvas || !targetId) return;
+                const obj = (fabricCanvas as any)
+                  .getObjects()
+                  .find((o: any) => o.itemUniqueId === targetId);
+                if (!obj) return;
+                saveUndoState();
+                import('fabric').then(({ fabric }) => {
+                  straightenAllObjectPoints(fabric, obj);
+                  (fabricCanvas as any).requestRenderAll();
+                  syncObjectsFromCanvas();
+                  readProps();
+                });
+              }}
+              className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1.5 text-[10px] bg-cream text-text-secondary rounded border border-border hover:border-terra transition-colors"
+              title="Straighten all corners"
+            >
+              Straighten
+            </button>
+          </div>
+          {props.hasCurves && (
+            <div>
+              <label className="text-[10px] text-text-muted mb-0.5 block">Smoothness</label>
+              <input
+                type="range"
+                min={5}
+                max={50}
+                step={1}
+                value={Math.round(props.curveTension * 100)}
+                onChange={(e) => {
+                  const tension = Number(e.target.value) / 100;
+                  const targetId = editingObjectId || (selectedIds.length === 1 ? selectedIds[0] : null);
+                  if (!fabricCanvas || !targetId) return;
+                  const obj = (fabricCanvas as any)
+                    .getObjects()
+                    .find((o: any) => o.itemUniqueId === targetId);
+                  if (!obj) return;
+                  import('fabric').then(({ fabric }) => {
+                    curveAllObjectPoints(fabric, obj, tension);
+                    (fabricCanvas as any).requestRenderAll();
+                    readProps();
+                  });
+                }}
+                onMouseUp={() => {
+                  saveUndoState();
+                  syncObjectsFromCanvas();
+                }}
+                onTouchEnd={() => {
+                  saveUndoState();
+                  syncObjectsFromCanvas();
+                }}
+                className="w-full accent-terra h-1"
+              />
+              <div className="text-[10px] text-text-muted text-right">
+                {Math.round(props.curveTension * 100)}%
+              </div>
             </div>
           )}
         </div>
