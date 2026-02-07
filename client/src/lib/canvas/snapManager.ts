@@ -8,8 +8,9 @@ import { getGridConfig } from '@/lib/units';
 export function snapToGrid(
   obj: fabric.Object,
   unit: UnitSystem,
+  gridSize?: number,
 ) {
-  const { smallStep } = getGridConfig(unit);
+  const { smallStep } = getGridConfig(unit, gridSize);
 
   const left = obj.left ?? 0;
   const top = obj.top ?? 0;
@@ -26,8 +27,9 @@ export function snapToGrid(
 export function snapScaleToGrid(
   obj: fabric.Object,
   unit: UnitSystem,
+  gridSize?: number,
 ) {
-  const { smallStep } = getGridConfig(unit);
+  const { smallStep } = getGridConfig(unit, gridSize);
 
   const w = (obj.width ?? 1) * (obj.scaleX ?? 1);
   const h = (obj.height ?? 1) * (obj.scaleY ?? 1);

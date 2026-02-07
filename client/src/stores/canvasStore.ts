@@ -39,7 +39,7 @@ interface CanvasState {
 
 function getObjectsMeta(canvas: fabric.Canvas): CanvasObjectMeta[] {
   return canvas.getObjects()
-    .filter((obj) => !(obj as any)._isEditHandle)
+    .filter((obj) => !(obj as any)._isEditHandle && !(obj as any)._isBgImage)
     .map((obj, index) => ({
       id: (obj as any).itemUniqueId ?? `obj-${index}`,
       itemId: (obj as any).itemId ?? '',

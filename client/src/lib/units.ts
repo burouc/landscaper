@@ -28,8 +28,33 @@ const IMPERIAL_GRID: GridConfig = {
   largeLabel: 'ft',
 };
 
-export function getGridConfig(unit: UnitSystem): GridConfig {
-  return unit === 'metric' ? METRIC_GRID : IMPERIAL_GRID;
+/**
+ * Get grid config for the given unit system and optional custom grid size.
+ * @param unit - 'metric' or 'imperial'
+ * @param gridSize - Large grid spacing in display units (meters or feet). Defaults to 1.
+ */
+export function getGridConfig(unit: UnitSystem, gridSize?: number): GridConfig {
+  if (!gridSize || gridSize <= 0) {
+    return unit === 'metric' ? METRIC_GRID : IMPERIAL_GRID;
+  }
+
+  if (unit === 'metric') {
+    const largeCm = gridSize * 100; // meters to cm
+    return {
+      smallStep: largeCm / 10,
+      largeStep: largeCm,
+      smallLabel: 'cm',
+      largeLabel: 'm',
+    };
+  } else {
+    const largeCm = gridSize * 30.48; // feet to cm
+    return {
+      smallStep: largeCm / 10,
+      largeStep: largeCm,
+      smallLabel: 'in',
+      largeLabel: 'ft',
+    };
+  }
 }
 
 export function cmToDisplay(cm: number, unit: UnitSystem): string {
