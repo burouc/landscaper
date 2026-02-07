@@ -136,7 +136,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       fabricCanvas.toJSON([
         'itemUniqueId', 'itemId', 'itemName', 'itemBehavior',
         'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg',
-        'itemPatternWidth', 'itemPatternHeight',
+        'itemPatternWidth', 'itemPatternHeight', 'itemCurveTension',
       ]),
     );
     const newStack = [...undoStack, json].slice(-MAX_UNDO);
@@ -146,7 +146,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   undo: () => {
     const { fabricCanvas, undoStack, redoStack, syncObjectsFromCanvas } = get();
     if (!fabricCanvas || undoStack.length === 0) return;
-    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight']));
+    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight', 'itemCurveTension']));
     const prevJson = undoStack[undoStack.length - 1];
     set({
       undoStack: undoStack.slice(0, -1),
@@ -161,7 +161,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   redo: () => {
     const { fabricCanvas, undoStack, redoStack, syncObjectsFromCanvas } = get();
     if (!fabricCanvas || redoStack.length === 0) return;
-    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight']));
+    const currentJson = JSON.stringify(fabricCanvas.toJSON(['itemUniqueId', 'itemId', 'itemName', 'itemBehavior', 'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg', 'itemPatternWidth', 'itemPatternHeight', 'itemCurveTension']));
     const nextJson = redoStack[redoStack.length - 1];
     set({
       redoStack: redoStack.slice(0, -1),
