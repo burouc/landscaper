@@ -21,6 +21,9 @@ import {
 } from '@/lib/canvas/pathEditor';
 import { v4 as uuidv4 } from 'uuid';
 
+/** Unique key to identify the background image object on the canvas */
+const BG_IMAGE_KEY = '__landscaper_bg_image__';
+
 export default function CanvasEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,16 +36,23 @@ export default function CanvasEditor() {
   const unit = useUIStore((s) => s.unit);
   const snapEnabled = useUIStore((s) => s.snapToGrid);
   const gridVisible = useUIStore((s) => s.gridVisible);
+  const gridSize = useUIStore((s) => s.gridSize);
   const zoom = useUIStore((s) => s.zoom);
   const setZoom = useUIStore((s) => s.setZoom);
+  const backgroundImage = useUIStore((s) => s.backgroundImage);
+  const calibratePhase = useUIStore((s) => s.calibrate.phase);
 
   // Refs for latest values (avoids stale closures in fabric callbacks)
   const unitRef = useRef(unit);
   const snapRef = useRef(snapEnabled);
   const gridRef = useRef(gridVisible);
+  const gridSizeRef = useRef(gridSize);
+  const calibratePhaseRef = useRef(calibratePhase);
   unitRef.current = unit;
   snapRef.current = snapEnabled;
   gridRef.current = gridVisible;
+  gridSizeRef.current = gridSize;
+  calibratePhaseRef.current = calibratePhase;
 
   // Initialise fabric canvas
   useEffect(() => {
@@ -67,7 +77,7 @@ export default function CanvasEditor() {
 
       // ── Grid rendering ──
       canvas.on('after:render', () => {
-        drawGrid(canvas as any, unitRef.current, gridRef.current);
+        drawGrid(canvas as any, unitRef.current, gridRef.current, gridSizeRef.current);
       });
 
       // ── Selection events ──
@@ -86,12 +96,12 @@ export default function CanvasEditor() {
       // ── Snap to grid ──
       canvas.on('object:moving', (e: any) => {
         if (snapRef.current && e.target) {
-          snapToGrid(e.target, unitRef.current);
+          snapToGrid(e.target, unitRef.current, gridSizeRef.current);
         }
       });
       canvas.on('object:scaling', (e: any) => {
         if (snapRef.current && e.target) {
-          snapScaleToGrid(e.target, unitRef.current);
+          snapScaleToGrid(e.target, unitRef.current, gridSizeRef.current);
         }
       });
 
@@ -107,7 +117,6 @@ export default function CanvasEditor() {
         if (!target) return;
         const behavior = target.itemBehavior;
         if (behavior === 'repeatable' || behavior === 'path') {
-          // Enter point editing mode
           const objId = target.itemUniqueId;
           if (objId) {
             useCanvasStore.getState().setEditingObjectId(objId);
@@ -119,7 +128,16 @@ export default function CanvasEditor() {
       });
 
       // ── Click on empty space exits edit mode ──
+      // ── Also handle calibration point picking ──
       canvas.on('mouse:down', (opt: any) => {
+        // Calibration mode: pick points
+        const cPhase = calibratePhaseRef.current;
+        if (cPhase === 'pick-start' || cPhase === 'pick-end') {
+          const pointer = canvas.getPointer(opt.e);
+          useUIStore.getState().setCalibratePoint({ x: pointer.x, y: pointer.y });
+          return;
+        }
+
         if (isEditing() && !opt.target) {
           exitEditMode();
           useCanvasStore.getState().setEditingObjectId(null);
@@ -171,18 +189,24 @@ export default function CanvasEditor() {
 
       // ── Keyboard shortcuts ──
       const handleKeyDown = (e: KeyboardEvent) => {
-        // Escape exits edit mode
-        if (e.key === 'Escape' && isEditing()) {
-          exitEditMode();
-          useCanvasStore.getState().setEditingObjectId(null);
-          useCanvasStore.getState().saveUndoState();
-          canvas.requestRenderAll();
-          return;
+        // Escape exits edit mode or calibration
+        if (e.key === 'Escape') {
+          if (calibratePhaseRef.current !== 'idle') {
+            useUIStore.getState().cancelCalibration();
+            return;
+          }
+          if (isEditing()) {
+            exitEditMode();
+            useCanvasStore.getState().setEditingObjectId(null);
+            useCanvasStore.getState().saveUndoState();
+            canvas.requestRenderAll();
+            return;
+          }
         }
 
         // Delete selected
         if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (isEditing()) return; // Don't delete while editing points
+          if (isEditing()) return;
           const active = canvas.getActiveObjects();
           if (active.length) {
             saveUndoState();
@@ -242,10 +266,48 @@ export default function CanvasEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-render when grid/unit changes
+  // Re-render when grid/unit/gridSize changes
   useEffect(() => {
     fabricRef.current?.requestRenderAll();
-  }, [gridVisible, unit]);
+  }, [gridVisible, unit, gridSize]);
+
+  // ── Background image sync ──
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+
+    import('fabric').then(({ fabric }) => {
+      // Remove existing background image object
+      const existing = canvas.getObjects().find((o: any) => o._isBgImage === BG_IMAGE_KEY);
+      if (existing) {
+        canvas.remove(existing);
+      }
+
+      if (!backgroundImage || !backgroundImage.visible) {
+        canvas.requestRenderAll();
+        return;
+      }
+
+      fabric.Image.fromURL(backgroundImage.src, (img: any) => {
+        if (!img) return;
+        img.set({
+          left: backgroundImage.x,
+          top: backgroundImage.y,
+          scaleX: backgroundImage.scale,
+          scaleY: backgroundImage.scale,
+          opacity: backgroundImage.opacity,
+          selectable: false,
+          evented: false,
+          excludeFromExport: true,
+          _isBgImage: BG_IMAGE_KEY,
+        });
+
+        canvas.add(img);
+        canvas.sendToBack(img);
+        canvas.requestRenderAll();
+      }, { crossOrigin: 'anonymous' });
+    });
+  }, [backgroundImage]);
 
   // ── Drag & drop from library ──
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -278,10 +340,12 @@ export default function CanvasEditor() {
     [],
   );
 
+  const isCalibrating = calibratePhase !== 'idle';
+
   return (
     <div
       ref={containerRef}
-      className="flex-1 relative overflow-hidden bg-cream"
+      className={`flex-1 relative overflow-hidden bg-cream ${isCalibrating ? 'cursor-crosshair' : ''}`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -294,6 +358,17 @@ export default function CanvasEditor() {
       {editingObjectId && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-terra/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
           Editing points — Dbl-click point to toggle curve · ESC to finish
+        </div>
+      )}
+      {/* Calibration mode indicator */}
+      {calibratePhase === 'pick-start' && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
+          Click the start of a known distance on the image · ESC to cancel
+        </div>
+      )}
+      {calibratePhase === 'pick-end' && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
+          Click the end of the known distance · ESC to cancel
         </div>
       )}
     </div>
@@ -315,7 +390,6 @@ function addItemToCanvas(
     } else if (item.behavior === 'path') {
       addPathItem(fabric, canvas, item, x, y, uniqueId);
     } else {
-      // Default SVG-based item creation for proportional, freeform, fixed
       addSvgItem(fabric, canvas, item, x, y, uniqueId);
     }
   });
@@ -335,14 +409,13 @@ function addRepeatableItem(
   const pathObj = new fabric.Path(pathString, {
     left: x - item.defaultWidth / 2,
     top: y - item.defaultHeight / 2,
-    fill: '#CCCCCC', // placeholder until pattern loads
+    fill: '#CCCCCC',
     stroke: '#999999',
     strokeWidth: 1,
     originX: 'left',
     originY: 'top',
   });
 
-  // Store metadata
   (pathObj as any).itemUniqueId = uniqueId;
   (pathObj as any).itemId = item.id;
   (pathObj as any).itemName = item.name;
@@ -363,14 +436,13 @@ function addRepeatableItem(
   canvas.requestRenderAll();
   store.syncObjectsFromCanvas();
 
-  // Load pattern asynchronously and apply
   if (item.patternSvg && item.patternWidth && item.patternHeight) {
     createFabricPattern(
       fabric,
       item.patternSvg,
       item.patternWidth,
       item.patternHeight,
-      0, // initial angle
+      0,
       (pattern) => {
         pathObj.set('fill', pattern);
         pathObj.set('stroke', 'rgba(0,0,0,0.15)');
@@ -406,7 +478,6 @@ function addPathItem(
     originY: 'center',
   });
 
-  // Store metadata
   (pathObj as any).itemUniqueId = uniqueId;
   (pathObj as any).itemId = item.id;
   (pathObj as any).itemName = item.name;
@@ -436,7 +507,6 @@ function addSvgItem(
   fabric.loadSVGFromString(item.svgPath, (objects: any[], options: any) => {
     const group = fabric.util.groupSVGElements(objects, options);
 
-    // Scale SVG to match default dimensions
     const svgWidth = group.width || 100;
     const svgHeight = group.height || 100;
     const scaleX = item.defaultWidth / svgWidth;
@@ -451,7 +521,6 @@ function addSvgItem(
       originY: 'top',
     });
 
-    // Store metadata on the fabric object
     (group as any).itemUniqueId = uniqueId;
     (group as any).itemId = item.id;
     (group as any).itemName = item.name;

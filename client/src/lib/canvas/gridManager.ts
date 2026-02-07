@@ -17,6 +17,7 @@ export function drawGrid(
   canvas: fabric.Canvas,
   unit: UnitSystem,
   gridVisible: boolean,
+  gridSize?: number,
 ) {
   if (!gridVisible) return;
 
@@ -27,7 +28,7 @@ export function drawGrid(
   if (!vpt) return;
 
   const zoom = canvas.getZoom();
-  const { smallStep, largeStep } = getGridConfig(unit);
+  const { smallStep, largeStep } = getGridConfig(unit, gridSize);
 
   // Convert step sizes to screen pixels
   const smallPx = smallStep * zoom;

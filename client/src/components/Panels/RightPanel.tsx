@@ -2,6 +2,7 @@
 
 import LayersPanel from './LayersPanel';
 import PropertiesPanel from './PropertiesPanel';
+import BackgroundPanel from './BackgroundPanel';
 
 export default function RightPanel() {
   return (
@@ -9,6 +10,7 @@ export default function RightPanel() {
       <div className="flex-1 overflow-y-auto">
         <LayersPanel />
       </div>
+      <BackgroundPanel />
       <PropertiesPanel />
     </div>
   );
