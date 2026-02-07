@@ -65,7 +65,6 @@ export default function CanvasEditor() {
       const canvas = new fabric.Canvas(canvasRef.current, {
         width: container.clientWidth,
         height: container.clientHeight,
-        backgroundColor: '#FFFFFF',
         selection: true,
         preserveObjectStacking: true,
         fireRightClick: true,
@@ -270,6 +269,18 @@ export default function CanvasEditor() {
   useEffect(() => {
     fabricRef.current?.requestRenderAll();
   }, [gridVisible, unit, gridSize]);
+
+  // Sync zoom from store to canvas (toolbar zoom buttons)
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const currentZoom = canvas.getZoom();
+    if (Math.abs(currentZoom - zoom) > 0.001) {
+      const center = canvas.getCenter();
+      canvas.zoomToPoint({ x: center.left, y: center.top } as any, zoom);
+      canvas.requestRenderAll();
+    }
+  }, [zoom]);
 
   // ── Background image sync ──
   useEffect(() => {

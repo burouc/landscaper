@@ -249,26 +249,32 @@ function applyPointsToObject(): void {
 function getWorldCoord(pt: { x: number; y: number }): { x: number; y: number } {
   if (!currentEdit) return pt;
   const obj = currentEdit.targetObj;
+  const fab = currentEdit.fabric;
   const pathOffset = obj.pathOffset || { x: 0, y: 0 };
-  // Transform point from path-local coords to canvas world coords
-  const left = obj.left ?? 0;
-  const top = obj.top ?? 0;
-  return {
-    x: left + pt.x - pathOffset.x,
-    y: top + pt.y - pathOffset.y,
-  };
+  // Convert path coords to object-centered coords, then apply full transform
+  const localX = pt.x - pathOffset.x;
+  const localY = pt.y - pathOffset.y;
+  const matrix = obj.calcTransformMatrix();
+  const transformed = fab.util.transformPoint(
+    new fab.Point(localX, localY),
+    matrix,
+  );
+  return { x: transformed.x, y: transformed.y };
 }
 
 function getLocalCoord(worldPt: { x: number; y: number }): { x: number; y: number } {
   if (!currentEdit) return worldPt;
   const obj = currentEdit.targetObj;
+  const fab = currentEdit.fabric;
   const pathOffset = obj.pathOffset || { x: 0, y: 0 };
-  const left = obj.left ?? 0;
-  const top = obj.top ?? 0;
-  return {
-    x: worldPt.x - left + pathOffset.x,
-    y: worldPt.y - top + pathOffset.y,
-  };
+  // Invert the object's transform to go from world coords back to path coords
+  const matrix = obj.calcTransformMatrix();
+  const invMatrix = fab.util.invertTransform(matrix);
+  const local = fab.util.transformPoint(
+    new fab.Point(worldPt.x, worldPt.y),
+    invMatrix,
+  );
+  return { x: local.x + pathOffset.x, y: local.y + pathOffset.y };
 }
 
 function rebuildHandles(): void {
