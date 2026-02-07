@@ -96,7 +96,15 @@ export function updatePathFromPoints(
 ): void {
   const oldLeft = obj.left ?? 0;
   const oldTop = obj.top ?? 0;
+  const oldWidth = obj.width ?? 0;
+  const oldHeight = obj.height ?? 0;
   const oldPathOffset = { x: obj.pathOffset?.x ?? 0, y: obj.pathOffset?.y ?? 0 };
+
+  // Visual anchor: the constant that maps path coords to world coords.
+  // For originX:'left', point P.x maps to: left + width/2 + P.x - pathOffset.x
+  // So the anchor = left + width/2 - pathOffset.x must stay the same.
+  const anchorX = oldLeft + oldWidth / 2 - oldPathOffset.x;
+  const anchorY = oldTop + oldHeight / 2 - oldPathOffset.y;
 
   const pathString = pathPointsToPathString(points, closed);
   const tempPath = new fabric.Path(pathString);
@@ -107,10 +115,11 @@ export function updatePathFromPoints(
   obj.set('height', tempPath.height);
   obj.set('pathOffset', { x: tempPath.pathOffset.x, y: tempPath.pathOffset.y });
 
-  // Maintain visual position
+  // Restore left/top so that anchor stays constant:
+  // newLeft + newWidth/2 - newPathOffset.x = anchorX
   obj.set({
-    left: oldLeft + (oldPathOffset.x - tempPath.pathOffset.x),
-    top: oldTop + (oldPathOffset.y - tempPath.pathOffset.y),
+    left: anchorX - tempPath.width / 2 + tempPath.pathOffset.x,
+    top: anchorY - tempPath.height / 2 + tempPath.pathOffset.y,
   });
 
   obj.setCoords();
