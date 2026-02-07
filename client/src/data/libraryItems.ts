@@ -60,6 +60,188 @@ export const libraryItems: LibraryItem[] = [
     ],
   },
   {
+    id: 'silver-birch',
+    name: 'Silver Birch',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="40" fill="#8CBF6E" stroke="#74A756" stroke-width="2"/>
+      <circle cx="38" cy="38" r="18" fill="#9ECF80" opacity="0.7"/>
+      <circle cx="62" cy="42" r="16" fill="#A6D78A" opacity="0.6"/>
+      <circle cx="50" cy="60" r="14" fill="#9ECF80" opacity="0.5"/>
+      <circle cx="50" cy="50" r="4" fill="#E8E0D4" stroke="#D0C8BC" stroke-width="1"/>
+    </svg>`,
+    defaultWidth: 350,
+    defaultHeight: 350,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 1800, step: 50, unit: 'cm', defaultValue: 600 },
+    ],
+  },
+  {
+    id: 'european-beech',
+    name: 'European Beech',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#3E6B3A" stroke="#2D5A2E" stroke-width="2"/>
+      <circle cx="50" cy="50" r="34" fill="#4A7C45" stroke="#3E6B3A" stroke-width="1"/>
+      <circle cx="42" cy="42" r="16" fill="#568D50" opacity="0.6"/>
+      <circle cx="58" cy="56" r="14" fill="#568D50" opacity="0.5"/>
+      <circle cx="50" cy="50" r="5" fill="#2D5A2E"/>
+    </svg>`,
+    defaultWidth: 450,
+    defaultHeight: 450,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 2500, step: 50, unit: 'cm', defaultValue: 700 },
+    ],
+  },
+  {
+    id: 'english-elm',
+    name: 'English Elm',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="50" rx="44" ry="42" fill="#4F7942" stroke="#3D6730" stroke-width="2"/>
+      <ellipse cx="40" cy="40" rx="20" ry="18" fill="#5F8952" opacity="0.6"/>
+      <ellipse cx="62" cy="55" rx="18" ry="16" fill="#5F8952" opacity="0.5"/>
+      <ellipse cx="45" cy="62" rx="14" ry="12" fill="#6F9962" opacity="0.4"/>
+      <circle cx="50" cy="50" r="5" fill="#3D6730"/>
+    </svg>`,
+    defaultWidth: 500,
+    defaultHeight: 500,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 2500, step: 50, unit: 'cm', defaultValue: 800 },
+    ],
+  },
+  {
+    id: 'linden',
+    name: 'Linden',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="44" fill="#5C8A4D" stroke="#4A7840" stroke-width="2"/>
+      <circle cx="50" cy="50" r="32" fill="#6C9A5D" stroke="#5C8A4D" stroke-width="1"/>
+      <circle cx="50" cy="50" r="18" fill="#7CAA6D" stroke="#6C9A5D" stroke-width="1"/>
+      <circle cx="50" cy="50" r="6" fill="#4A7840"/>
+    </svg>`,
+    defaultWidth: 400,
+    defaultHeight: 400,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 2200, step: 50, unit: 'cm', defaultValue: 700 },
+    ],
+  },
+  {
+    id: 'horse-chestnut',
+    name: 'Horse Chestnut',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#3D7A3D" stroke="#2C692C" stroke-width="2"/>
+      <circle cx="35" cy="38" r="16" fill="#4D8A4D" opacity="0.7"/>
+      <circle cx="65" cy="38" r="15" fill="#4D8A4D" opacity="0.65"/>
+      <circle cx="35" cy="62" r="14" fill="#4D8A4D" opacity="0.6"/>
+      <circle cx="65" cy="62" r="15" fill="#4D8A4D" opacity="0.55"/>
+      <circle cx="50" cy="50" r="12" fill="#5D9A5D" opacity="0.5"/>
+      <circle cx="50" cy="50" r="5" fill="#2C692C"/>
+    </svg>`,
+    defaultWidth: 500,
+    defaultHeight: 500,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 2000, step: 50, unit: 'cm', defaultValue: 700 },
+    ],
+  },
+  {
+    id: 'weeping-willow',
+    name: 'Weeping Willow',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#7BA66E" stroke="#6B965E" stroke-width="1.5" opacity="0.7"/>
+      <circle cx="50" cy="50" r="34" fill="#8BB67E" stroke="#7BA66E" stroke-width="1" opacity="0.8"/>
+      <ellipse cx="30" cy="60" rx="12" ry="20" fill="#8BB67E" opacity="0.4"/>
+      <ellipse cx="70" cy="60" rx="12" ry="20" fill="#8BB67E" opacity="0.4"/>
+      <ellipse cx="50" cy="62" rx="10" ry="18" fill="#9BC68E" opacity="0.35"/>
+      <circle cx="50" cy="46" r="10" fill="#6B965E" opacity="0.5"/>
+      <circle cx="50" cy="46" r="4" fill="#5A854D"/>
+    </svg>`,
+    defaultWidth: 550,
+    defaultHeight: 550,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 1500, step: 50, unit: 'cm', defaultValue: 600 },
+    ],
+  },
+  {
+    id: 'italian-cypress',
+    name: 'Italian Cypress',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="50" rx="16" ry="42" fill="#2D5A3D" stroke="#1A4028" stroke-width="2"/>
+      <ellipse cx="50" cy="50" rx="10" ry="34" fill="#3A6B4A" opacity="0.6"/>
+      <ellipse cx="50" cy="50" rx="5" ry="20" fill="#4A7C59" opacity="0.4"/>
+      <circle cx="50" cy="50" r="3" fill="#1A4028"/>
+    </svg>`,
+    defaultWidth: 120,
+    defaultHeight: 120,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 200, max: 2500, step: 50, unit: 'cm', defaultValue: 1000 },
+    ],
+  },
+  {
+    id: 'olive-tree',
+    name: 'Olive Tree',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="48" rx="38" ry="34" fill="#8A9A6C" stroke="#7A8A5C" stroke-width="2"/>
+      <ellipse cx="38" cy="42" rx="16" ry="14" fill="#9AAA7C" opacity="0.6"/>
+      <ellipse cx="64" cy="50" rx="14" ry="12" fill="#9AAA7C" opacity="0.5"/>
+      <ellipse cx="48" cy="58" rx="12" ry="10" fill="#A0B080" opacity="0.4"/>
+      <circle cx="50" cy="48" r="5" fill="#6A7A50"/>
+    </svg>`,
+    defaultWidth: 300,
+    defaultHeight: 300,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 1200, step: 50, unit: 'cm', defaultValue: 400 },
+    ],
+  },
+  {
+    id: 'scots-pine',
+    name: 'Scots Pine',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="48" r="32" fill="#3A6B4A" stroke="#2A5B3A" stroke-width="2"/>
+      <circle cx="36" cy="40" r="16" fill="#4A7C5A" opacity="0.7"/>
+      <circle cx="64" cy="44" r="14" fill="#4A7C5A" opacity="0.6"/>
+      <circle cx="50" cy="58" r="12" fill="#4A7C5A" opacity="0.5"/>
+      <circle cx="50" cy="48" r="5" fill="#8B6F47" stroke="#7A5F37" stroke-width="1"/>
+    </svg>`,
+    defaultWidth: 350,
+    defaultHeight: 350,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 2500, step: 50, unit: 'cm', defaultValue: 900 },
+    ],
+  },
+  {
+    id: 'english-yew',
+    name: 'English Yew',
+    category: 'trees-shrubs',
+    behavior: 'proportional',
+    svgPath: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="42" fill="#2A5030" stroke="#1A4020" stroke-width="2"/>
+      <circle cx="50" cy="50" r="30" fill="#3A6040" stroke="#2A5030" stroke-width="1"/>
+      <circle cx="42" cy="42" r="12" fill="#4A7050" opacity="0.5"/>
+      <circle cx="58" cy="56" r="10" fill="#4A7050" opacity="0.4"/>
+      <circle cx="50" cy="50" r="4" fill="#1A4020"/>
+    </svg>`,
+    defaultWidth: 300,
+    defaultHeight: 300,
+    properties: [
+      { key: 'height', label: 'Height', type: 'number', min: 100, max: 1500, step: 50, unit: 'cm', defaultValue: 500 },
+    ],
+  },
+  {
     id: 'hedge',
     name: 'Hedge',
     category: 'trees-shrubs',
