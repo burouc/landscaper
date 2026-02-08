@@ -19,6 +19,18 @@ import {
   exitEditMode,
   isEditing,
 } from '@/lib/canvas/pathEditor';
+import {
+  applyObjectSnap,
+  clearGuides,
+  drawAlignmentGuides,
+} from '@/lib/canvas/objectSnapManager';
+import {
+  drawMeasurements,
+  addMeasureLine,
+  removeMeasureLine,
+  hitTestMeasureLine,
+  MeasurePoint,
+} from '@/lib/canvas/measureTool';
 import { v4 as uuidv4 } from 'uuid';
 
 /** Unique key to identify the background image object on the canvas */
@@ -35,23 +47,34 @@ export default function CanvasEditor() {
   const editingObjectId = useCanvasStore((s) => s.editingObjectId);
   const unit = useUIStore((s) => s.unit);
   const snapEnabled = useUIStore((s) => s.snapToGrid);
+  const objectSnapEnabled = useUIStore((s) => s.objectSnap);
   const gridVisible = useUIStore((s) => s.gridVisible);
   const gridSize = useUIStore((s) => s.gridSize);
   const zoom = useUIStore((s) => s.zoom);
   const setZoom = useUIStore((s) => s.setZoom);
+  const activeTool = useUIStore((s) => s.activeTool);
+  const setActiveTool = useUIStore((s) => s.setActiveTool);
   const backgroundImage = useUIStore((s) => s.backgroundImage);
   const calibratePhase = useUIStore((s) => s.calibrate.phase);
+
+  // Measure tool state
+  const measureStartRef = useRef<MeasurePoint | null>(null);
+  const activeMeasureRef = useRef<{ start: MeasurePoint; end: MeasurePoint } | null>(null);
 
   // Refs for latest values (avoids stale closures in fabric callbacks)
   const unitRef = useRef(unit);
   const snapRef = useRef(snapEnabled);
+  const objectSnapRef = useRef(objectSnapEnabled);
   const gridRef = useRef(gridVisible);
   const gridSizeRef = useRef(gridSize);
+  const activeToolRef = useRef(activeTool);
   const calibratePhaseRef = useRef(calibratePhase);
   unitRef.current = unit;
   snapRef.current = snapEnabled;
+  objectSnapRef.current = objectSnapEnabled;
   gridRef.current = gridVisible;
   gridSizeRef.current = gridSize;
+  activeToolRef.current = activeTool;
   calibratePhaseRef.current = calibratePhase;
 
   // Initialise fabric canvas
@@ -74,9 +97,11 @@ export default function CanvasEditor() {
       fabricRef.current = canvas;
       setFabricCanvas(canvas as any);
 
-      // ── Grid rendering ──
+      // ── Grid rendering + alignment guides + measurements ──
       canvas.on('after:render', () => {
         drawGrid(canvas as any, unitRef.current, gridRef.current, gridSizeRef.current);
+        drawAlignmentGuides(canvas as any);
+        drawMeasurements(canvas as any, unitRef.current, activeMeasureRef.current);
       });
 
       // ── Selection events ──
@@ -92,10 +117,13 @@ export default function CanvasEditor() {
         setSelectedIds([]);
       });
 
-      // ── Snap to grid ──
+      // ── Snap to grid + object snap ──
       canvas.on('object:moving', (e: any) => {
         if (snapRef.current && e.target) {
           snapToGrid(e.target, unitRef.current, gridSizeRef.current);
+        }
+        if (objectSnapRef.current && e.target) {
+          applyObjectSnap(canvas as any, e.target);
         }
       });
       canvas.on('object:scaling', (e: any) => {
@@ -106,6 +134,7 @@ export default function CanvasEditor() {
 
       // ── Undo state on modification end ──
       canvas.on('object:modified', () => {
+        clearGuides(canvas as any);
         saveUndoState();
         syncObjectsFromCanvas();
       });
@@ -127,13 +156,37 @@ export default function CanvasEditor() {
       });
 
       // ── Click on empty space exits edit mode ──
-      // ── Also handle calibration point picking ──
+      // ── Also handle calibration point picking and measure tool ──
       canvas.on('mouse:down', (opt: any) => {
         // Calibration mode: pick points
         const cPhase = calibratePhaseRef.current;
         if (cPhase === 'pick-start' || cPhase === 'pick-end') {
           const pointer = canvas.getPointer(opt.e);
           useUIStore.getState().setCalibratePoint({ x: pointer.x, y: pointer.y });
+          return;
+        }
+
+        // Measure tool: start measurement
+        if (activeToolRef.current === 'measure') {
+          const pointer = canvas.getPointer(opt.e);
+
+          // Right-click to delete a measurement near cursor
+          if (opt.e.button === 2) {
+            const rect = (containerRef.current || canvasRef.current)?.getBoundingClientRect();
+            if (rect) {
+              const screenX = opt.e.clientX - rect.left;
+              const screenY = opt.e.clientY - rect.top;
+              const hitId = hitTestMeasureLine(canvas as any, screenX, screenY);
+              if (hitId) {
+                removeMeasureLine(hitId);
+                canvas.requestRenderAll();
+              }
+            }
+            return;
+          }
+
+          measureStartRef.current = { x: pointer.x, y: pointer.y };
+          activeMeasureRef.current = null;
           return;
         }
 
@@ -173,6 +226,17 @@ export default function CanvasEditor() {
         }
       });
       canvas.on('mouse:move', (opt: any) => {
+        // Measure tool: update active measurement preview
+        if (activeToolRef.current === 'measure' && measureStartRef.current) {
+          const pointer = canvas.getPointer(opt.e);
+          activeMeasureRef.current = {
+            start: measureStartRef.current,
+            end: { x: pointer.x, y: pointer.y },
+          };
+          canvas.requestRenderAll();
+          return;
+        }
+
         if (!isPanning) return;
         const vpt = canvas.viewportTransform!;
         vpt[4] += opt.e.clientX - lastPosX;
@@ -182,14 +246,55 @@ export default function CanvasEditor() {
         canvas.requestRenderAll();
       });
       canvas.on('mouse:up', () => {
+        // Finalize measure tool
+        if (activeToolRef.current === 'measure' && measureStartRef.current && activeMeasureRef.current) {
+          const { start, end } = activeMeasureRef.current;
+          const dx = end.x - start.x;
+          const dy = end.y - start.y;
+          // Only add if dragged a meaningful distance (> 5 cm)
+          if (Math.sqrt(dx * dx + dy * dy) > 5) {
+            addMeasureLine(start, end);
+          }
+          measureStartRef.current = null;
+          activeMeasureRef.current = null;
+          canvas.requestRenderAll();
+          return;
+        }
+
+        // Clear alignment guides on drop
+        clearGuides(canvas as any);
+
         isPanning = false;
         canvas.selection = true;
       });
 
       // ── Keyboard shortcuts ──
       const handleKeyDown = (e: KeyboardEvent) => {
-        // Escape exits edit mode or calibration
+        // Don't handle shortcuts if user is typing in an input
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        // Tool shortcuts
+        if (e.key === 'v' || e.key === 'V') {
+          useUIStore.getState().setActiveTool('select');
+          return;
+        }
+        if (e.key === 'm' || e.key === 'M') {
+          const current = useUIStore.getState().activeTool;
+          useUIStore.getState().setActiveTool(current === 'measure' ? 'select' : 'measure');
+          return;
+        }
+
+        // Escape exits edit mode, calibration, or measure tool
         if (e.key === 'Escape') {
+          if (activeToolRef.current === 'measure') {
+            // Cancel in-progress measurement
+            measureStartRef.current = null;
+            activeMeasureRef.current = null;
+            useUIStore.getState().setActiveTool('select');
+            canvas.requestRenderAll();
+            return;
+          }
           if (calibratePhaseRef.current !== 'idle') {
             useUIStore.getState().cancelCalibration();
             return;
@@ -352,11 +457,25 @@ export default function CanvasEditor() {
   );
 
   const isCalibrating = calibratePhase !== 'idle';
+  const isMeasuring = activeTool === 'measure';
+
+  // Disable fabric selection when in measure mode
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = !isMeasuring;
+    canvas.forEachObject((obj: any) => {
+      if (!obj._isEditHandle && !obj._isBgImage) {
+        obj.set('evented', !isMeasuring);
+      }
+    });
+    canvas.requestRenderAll();
+  }, [isMeasuring]);
 
   return (
     <div
       ref={containerRef}
-      className={`flex-1 relative overflow-hidden bg-cream ${isCalibrating ? 'cursor-crosshair' : ''}`}
+      className={`flex-1 relative overflow-hidden bg-cream ${isCalibrating || isMeasuring ? 'cursor-crosshair' : ''}`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -365,8 +484,14 @@ export default function CanvasEditor() {
       <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur px-2 py-1 rounded text-xs text-text-secondary select-none">
         {Math.round(zoom * 100)}%
       </div>
+      {/* Measure mode indicator */}
+      {isMeasuring && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
+          Click & drag to measure · Right-click label to delete · ESC to exit
+        </div>
+      )}
       {/* Edit mode indicator */}
-      {editingObjectId && (
+      {editingObjectId && !isMeasuring && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-terra/90 text-white text-xs px-3 py-1.5 rounded-full shadow select-none">
           Editing points — Dbl-click point to toggle curve · ESC to finish
         </div>

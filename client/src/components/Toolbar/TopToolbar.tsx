@@ -12,9 +12,13 @@ import {
   Download,
   Image as ImageIcon,
   ChevronDown,
+  MousePointer2,
+  Move,
+  Trash2,
 } from 'lucide-react';
 import { useUIStore, METRIC_GRID_SIZES, IMPERIAL_GRID_SIZES } from '@/stores/uiStore';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { clearAllMeasureLines, getMeasureLines } from '@/lib/canvas/measureTool';
 
 export default function TopToolbar() {
   const unit = useUIStore((s) => s.unit);
@@ -27,6 +31,10 @@ export default function TopToolbar() {
   const setGridSize = useUIStore((s) => s.setGridSize);
   const zoom = useUIStore((s) => s.zoom);
   const setZoom = useUIStore((s) => s.setZoom);
+  const objectSnap = useUIStore((s) => s.objectSnap);
+  const toggleObjectSnap = useUIStore((s) => s.toggleObjectSnap);
+  const activeTool = useUIStore((s) => s.activeTool);
+  const setActiveTool = useUIStore((s) => s.setActiveTool);
   const backgroundImage = useUIStore((s) => s.backgroundImage);
   const setBackgroundImage = useUIStore((s) => s.setBackgroundImage);
 
@@ -130,6 +138,32 @@ export default function TopToolbar() {
 
         <Divider />
 
+        {/* Tool selection: Select / Measure */}
+        <ToolbarButton
+          icon={<MousePointer2 size={16} />}
+          label="Select tool (V)"
+          onClick={() => setActiveTool('select')}
+          active={activeTool === 'select'}
+        />
+        <ToolbarButton
+          icon={<Ruler size={16} />}
+          label="Measure tool (M)"
+          onClick={() => setActiveTool(activeTool === 'measure' ? 'select' : 'measure')}
+          active={activeTool === 'measure'}
+        />
+        {activeTool === 'measure' && (
+          <ToolbarButton
+            icon={<Trash2 size={14} />}
+            label="Clear all measurements"
+            onClick={() => {
+              clearAllMeasureLines();
+              fabricCanvas?.requestRenderAll();
+            }}
+          />
+        )}
+
+        <Divider />
+
         {/* Grid toggle + size dropdown */}
         <ToolbarButton
           icon={<Grid3x3 size={16} />}
@@ -177,6 +211,12 @@ export default function TopToolbar() {
           onClick={toggleSnap}
           active={snapToGrid}
         />
+        <ToolbarButton
+          icon={<Move size={16} />}
+          label="Snap to objects"
+          onClick={toggleObjectSnap}
+          active={objectSnap}
+        />
 
         <Divider />
 
@@ -186,8 +226,7 @@ export default function TopToolbar() {
           className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-secondary hover:bg-cream transition-colors"
           title="Toggle unit system"
         >
-          <Ruler size={14} />
-          <span className="font-medium uppercase">{unit === 'metric' ? 'M' : 'FT'}</span>
+          <span className="font-medium uppercase text-[11px]">{unit === 'metric' ? 'Metric' : 'Imperial'}</span>
         </button>
 
         <Divider />
