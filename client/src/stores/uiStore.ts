@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { UnitSystem } from '@/types/project';
 import { ItemCategory } from '@/types/items';
 
+export type ActiveTool = 'select' | 'measure';
+
 /** Grid size presets in display units (meters for metric, feet for imperial) */
 export const METRIC_GRID_SIZES = [0.25, 0.5, 1, 2, 5];
 export const IMPERIAL_GRID_SIZES = [0.5, 1, 2, 5, 10];
@@ -40,12 +42,17 @@ export interface CalibrateState {
 interface UIState {
   unit: UnitSystem;
   snapToGrid: boolean;
+  /** Snap to other objects' edges/centers */
+  objectSnap: boolean;
   gridVisible: boolean;
   /** Large grid spacing in display units (meters for metric, feet for imperial) */
   gridSize: number;
   zoom: number;
   selectedCategory: ItemCategory;
   librarySearch: string;
+
+  /** Currently active tool */
+  activeTool: ActiveTool;
 
   /** Background image */
   backgroundImage: BackgroundImageState | null;
@@ -54,11 +61,13 @@ interface UIState {
 
   setUnit: (unit: UnitSystem) => void;
   toggleSnap: () => void;
+  toggleObjectSnap: () => void;
   toggleGrid: () => void;
   setGridSize: (size: number) => void;
   setZoom: (zoom: number) => void;
   setSelectedCategory: (category: ItemCategory) => void;
   setLibrarySearch: (search: string) => void;
+  setActiveTool: (tool: ActiveTool) => void;
 
   setBackgroundImage: (bg: BackgroundImageState | null) => void;
   updateBackgroundImage: (updates: Partial<BackgroundImageState>) => void;
@@ -74,11 +83,13 @@ interface UIState {
 export const useUIStore = create<UIState>((set, get) => ({
   unit: 'metric',
   snapToGrid: true,
+  objectSnap: true,
   gridVisible: true,
   gridSize: 1, // 1 meter (metric) or 1 foot (imperial)
   zoom: 1,
   selectedCategory: 'trees-shrubs',
   librarySearch: '',
+  activeTool: 'select',
   backgroundImage: null,
   calibrate: {
     phase: 'idle',
@@ -92,11 +103,13 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ unit, gridSize: 1 });
   },
   toggleSnap: () => set((s) => ({ snapToGrid: !s.snapToGrid })),
+  toggleObjectSnap: () => set((s) => ({ objectSnap: !s.objectSnap })),
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
   setGridSize: (gridSize) => set({ gridSize }),
   setZoom: (zoom) => set({ zoom: Math.min(4, Math.max(0.25, zoom)) }),
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setLibrarySearch: (search) => set({ librarySearch: search }),
+  setActiveTool: (tool) => set({ activeTool: tool }),
 
   setBackgroundImage: (bg) => set({ backgroundImage: bg }),
   updateBackgroundImage: (updates) => {
