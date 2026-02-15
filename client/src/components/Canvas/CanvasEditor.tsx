@@ -36,10 +36,18 @@ import { v4 as uuidv4 } from 'uuid';
 /** Unique key to identify the background image object on the canvas */
 const BG_IMAGE_KEY = '__landscaper_bg_image__';
 
+/** Custom properties preserved during object clone/serialization */
+const CUSTOM_PROPS = [
+  'itemUniqueId', 'itemId', 'itemName', 'itemBehavior',
+  'itemPathPoints', 'itemPatternAngle', 'itemPatternSvg',
+  'itemPatternWidth', 'itemPatternHeight', 'itemCurveTension',
+];
+
 export default function CanvasEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fabricRef = useRef<any>(null);
+  const clipboardRef = useRef<any>(null);
 
   const { setFabricCanvas, syncObjectsFromCanvas, setSelectedIds, saveUndoState } =
     useCanvasStore();
@@ -337,6 +345,78 @@ export default function CanvasEditor() {
             useCanvasStore.getState().setEditingObjectId(null);
           }
           useCanvasStore.getState().redo();
+        }
+        // Copy
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+          e.preventDefault();
+          const activeObj = canvas.getActiveObject();
+          if (activeObj) {
+            activeObj.clone((cloned: any) => {
+              clipboardRef.current = cloned;
+            }, CUSTOM_PROPS);
+          }
+        }
+        // Paste
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+          e.preventDefault();
+          if (!clipboardRef.current) return;
+          clipboardRef.current.clone((cloned: any) => {
+            canvas.discardActiveObject();
+            cloned.set({
+              left: (cloned.left || 0) + 20,
+              top: (cloned.top || 0) + 20,
+              evented: true,
+            });
+            if (cloned.type === 'activeSelection') {
+              cloned.canvas = canvas;
+              cloned.forEachObject((obj: any) => {
+                obj.itemUniqueId = uuidv4();
+                canvas.add(obj);
+              });
+              cloned.setCoords();
+            } else {
+              cloned.itemUniqueId = uuidv4();
+              canvas.add(cloned);
+            }
+            // Shift clipboard so next paste offsets further
+            clipboardRef.current.set({
+              left: (clipboardRef.current.left || 0) + 20,
+              top: (clipboardRef.current.top || 0) + 20,
+            });
+            canvas.setActiveObject(cloned);
+            canvas.requestRenderAll();
+            saveUndoState();
+            syncObjectsFromCanvas();
+          }, CUSTOM_PROPS);
+        }
+        // Duplicate
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+          e.preventDefault();
+          const activeObj = canvas.getActiveObject();
+          if (!activeObj) return;
+          activeObj.clone((cloned: any) => {
+            canvas.discardActiveObject();
+            cloned.set({
+              left: (cloned.left || 0) + 20,
+              top: (cloned.top || 0) + 20,
+              evented: true,
+            });
+            if (cloned.type === 'activeSelection') {
+              cloned.canvas = canvas;
+              cloned.forEachObject((obj: any) => {
+                obj.itemUniqueId = uuidv4();
+                canvas.add(obj);
+              });
+              cloned.setCoords();
+            } else {
+              cloned.itemUniqueId = uuidv4();
+              canvas.add(cloned);
+            }
+            canvas.setActiveObject(cloned);
+            canvas.requestRenderAll();
+            saveUndoState();
+            syncObjectsFromCanvas();
+          }, CUSTOM_PROPS);
         }
       };
       document.addEventListener('keydown', handleKeyDown);
