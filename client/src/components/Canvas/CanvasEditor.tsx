@@ -48,6 +48,7 @@ export default function CanvasEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fabricRef = useRef<any>(null);
   const clipboardRef = useRef<any>(null);
+  const spaceHeldRef = useRef(false);
 
   const { setFabricCanvas, syncObjectsFromCanvas, setSelectedIds, saveUndoState } =
     useCanvasStore();
@@ -226,11 +227,12 @@ export default function CanvasEditor() {
       let lastPosY = 0;
 
       canvas.on('mouse:down', (opt: any) => {
-        if (opt.e.button === 1 || opt.e.altKey) {
+        if (opt.e.button === 1 || opt.e.altKey || spaceHeldRef.current) {
           isPanning = true;
           lastPosX = opt.e.clientX;
           lastPosY = opt.e.clientY;
           canvas.selection = false;
+          if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
         }
       });
       canvas.on('mouse:move', (opt: any) => {
@@ -273,7 +275,13 @@ export default function CanvasEditor() {
         clearGuides(canvas as any);
 
         isPanning = false;
-        canvas.selection = true;
+        if (spaceHeldRef.current) {
+          // Still holding space — keep grab cursor, selection stays off
+          if (containerRef.current) containerRef.current.style.cursor = 'grab';
+        } else {
+          canvas.selection = true;
+          if (containerRef.current) containerRef.current.style.cursor = '';
+        }
       });
 
       // ── Keyboard shortcuts ──
@@ -281,6 +289,33 @@ export default function CanvasEditor() {
         // Don't handle shortcuts if user is typing in an input
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        // Space to enter pan mode
+        if (e.key === ' ' && !e.repeat) {
+          e.preventDefault();
+          spaceHeldRef.current = true;
+          canvas.selection = false;
+          canvas.forEachObject((obj: any) => {
+            if (!obj._isEditHandle && !obj._isBgImage) {
+              obj.set('evented', false);
+            }
+          });
+          if (containerRef.current) containerRef.current.style.cursor = 'grab';
+          return;
+        }
+
+        // Arrow keys to pan viewport
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          const step = e.shiftKey ? 200 : 50;
+          const vpt = canvas.viewportTransform!;
+          if (e.key === 'ArrowUp') vpt[5] += step;
+          if (e.key === 'ArrowDown') vpt[5] -= step;
+          if (e.key === 'ArrowLeft') vpt[4] += step;
+          if (e.key === 'ArrowRight') vpt[4] -= step;
+          canvas.requestRenderAll();
+          return;
+        }
 
         // Tool shortcuts
         if (e.key === 'v' || e.key === 'V') {
@@ -421,6 +456,23 @@ export default function CanvasEditor() {
       };
       document.addEventListener('keydown', handleKeyDown);
 
+      const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.key === ' ') {
+          spaceHeldRef.current = false;
+          const measuring = activeToolRef.current === 'measure';
+          canvas.selection = !measuring;
+          canvas.forEachObject((obj: any) => {
+            if (!obj._isEditHandle && !obj._isBgImage) {
+              obj.set('evented', !measuring);
+            }
+          });
+          if (containerRef.current) {
+            containerRef.current.style.cursor = measuring ? 'crosshair' : '';
+          }
+        }
+      };
+      document.addEventListener('keyup', handleKeyUp);
+
       // ── Resize handler ──
       const ro = new ResizeObserver(() => {
         if (!containerRef.current) return;
@@ -435,6 +487,7 @@ export default function CanvasEditor() {
       // Cleanup
       return () => {
         document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
         ro.disconnect();
       };
     });
